@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoadRec live vehicle tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{--bg:#e6e9ea;--panel:#fff;--ink:#1c2125;--mute:#5c666e;--line:#cdd3d6;--yel:#f0b90b;--red:#b3261e;--teal:#16695c;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#15191c;--panel:#1e2428;--ink:#e8ecee;--mute:#9aa5ad;--line:#333c42;--red:#f2877f;--teal:#6fcab9}}
+:root[data-theme=dark]{--bg:#15191c;--panel:#1e2428;--ink:#e8ecee;--mute:#9aa5ad;--line:#333c42;--red:#f2877f;--teal:#6fcab9;color-scheme:dark}
+:root[data-theme=light]{color-scheme:light}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif}
+header{background:var(--panel);border-bottom:3px solid var(--yel)}
+header .in{max-width:620px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{font:700 26px "Barlow Semi Condensed",system-ui,sans-serif;color:var(--ink);text-decoration:none}
+.brand span{color:var(--mute);font-weight:500;font-size:15px;margin-left:10px}
+.nav{display:flex;gap:8px}
+.nav a{color:var(--ink);text-decoration:none;font:600 15px "Barlow Semi Condensed",system-ui,sans-serif;padding:6px 12px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
+.nav a:hover{border-color:var(--yel)}.nav a[aria-current=page]{background:var(--yel);border-color:var(--yel);color:#1c2125}
+main{max-width:620px;margin:0 auto;padding:22px 18px}
+.card{background:var(--panel);border:1px solid var(--line);border-top:5px solid var(--yel);border-radius:4px;padding:22px;margin-bottom:14px}
+h1{margin:0 0 6px;font:700 26px "Barlow Semi Condensed",system-ui,sans-serif}p{margin:6px 0;color:var(--mute)}
+input{width:100%;font:600 24px ui-monospace,monospace;text-align:center;padding:10px;border:1px solid var(--line);border-radius:3px;background:var(--bg);color:var(--ink);margin:12px 0}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--yel);outline-offset:2px}
+#vcode{text-transform:uppercase;letter-spacing:.15em}#otp{letter-spacing:.4em}
+button.go{cursor:pointer;background:var(--yel);color:#1c2125;font:600 17px "Barlow Semi Condensed",system-ui,sans-serif;padding:10px 18px;border:0;border-radius:3px;width:100%}
+.err{color:var(--red);font-weight:600;min-height:24px}.ok{color:var(--teal);font-weight:600}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:12px 0}dt{color:var(--mute)}dd{margin:0;font-weight:600;text-align:right}
+#map{width:100%;height:340px;background:var(--bg);border:1px solid var(--line);border-radius:3px;z-index:0}
+a{color:var(--teal)}[hidden]{display:none!important}
+.srv{font-size:14px;margin-top:14px}.srv input{font:14px ui-monospace,monospace;letter-spacing:0;text-align:left;margin:4px 0 0}
+.note{font-size:14px}.veh{display:block;width:100%;text-align:left;cursor:pointer;margin:8px 0;padding:12px;border:1px solid var(--line);border-radius:3px;background:var(--bg);color:var(--ink);font:600 17px Barlow,system-ui}.veh small{display:block;color:var(--mute);font-weight:400}.veh:hover{border-color:var(--yel)}
+</style></head><body>
+<header><div class="in"><a class="brand" href="index.html">RoadRec<span>live vehicle tracking</span></a>
+ <nav class="nav" aria-label="Pages"><a href="index.html" id="back">&larr; Event reader</a><a href="live.html" aria-current="page">Live tracking</a></nav></div></header>
+<main>
+ <!-- Owner login (the default) -->
+ <div class="card" id="gate-login">
+  <h1>Track your vehicles</h1>
+  <p>Sign in with your RoadRec fleet account. You can only see vehicles registered to you.</p>
+  <form id="lf" autocomplete="on">
+   <input id="em" type="email" autocomplete="username" placeholder="you@example.com" aria-label="Email" style="font:16px Barlow,system-ui;text-align:left;letter-spacing:0">
+   <input id="pw" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" style="font:16px Barlow,system-ui;text-align:left;letter-spacing:0">
+   <button class="go" type="submit">Sign in</button>
+  </form>
+ </div>
+ <div class="card" id="gate-pick" hidden>
+  <h1>Your vehicles</h1><p id="who"></p>
+  <div id="vlist"></div>
+  <p><button class="go" id="signout" type="button" style="background:var(--panel);color:var(--ink);border:1px solid var(--line)">Sign out</button></p>
+ </div>
+
+ <!-- Share link + 6-digit code (live.html?c=LINKCODE) -->
+ <div class="card" id="gate-otp" hidden>
+  <h1>Unlock live tracking</h1>
+  <p>This link needs the 6-digit code the vehicle owner gave you separately.</p>
+  <input id="otp" inputmode="numeric" maxlength="6" placeholder="------" autocomplete="one-time-code" aria-label="6-digit code">
+  <button class="go" id="go-otp" type="button">Unlock</button>
+ </div>
+ <p class="err" id="e" role="alert"></p>
+
+ <div class="card" id="view" hidden>
+  <h1 id="reg"></h1><p id="lbl"></p>
+  <p id="stat" class="ok">Connecting...</p>
+  <div id="map" role="img" aria-label="Live map of the vehicle"></div><p class="note" id="mapnote" hidden>The map could not load (no internet?). Position details are still shown below.</p>
+  <dl>
+    <dt>Position</dt><dd id="pos">-</dd>
+    <dt>Speed</dt><dd id="spd">-</dd>
+    <dt>Last fix</dt><dd id="ts">-</dd>
+    <dt id="k-extra">Vehicle</dt><dd id="v-extra">-</dd>
+  </dl>
+  <p><a id="osm" target="_blank" rel="noopener noreferrer" hidden>Open in OpenStreetMap</a></p>
+  <p><button class="go" id="stop" type="button" style="background:var(--panel);color:var(--ink);border:1px solid var(--line)">Stop tracking</button></p>
+ </div>
+
+ <div class="srv" id="apirow" hidden><label for="api">RoadRec server address</label><input id="api" autocomplete="off" spellcheck="false"></div>
+ <p class="note" id="srvnote"></p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const q = new URLSearchParams(location.search);
+const store = {
+  get(k){ try { return localStorage.getItem(k) } catch(_) { return null } },
+  set(k,v){ try { localStorage.setItem(k,v) } catch(_) {} }
+};
+// Same theme choice as the event reader
+(function(){ const t = store.get("roadrec.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t })();
+
+// ---- server address: ?api=... > saved by either page > local default ---------------------------------
+const apiEl = $("api");
+apiEl.value = q.get("api") || store.get("roadrec_api") || "http://localhost:8000";
+if (!q.get("api")) $("apirow").hidden = false;
+apiEl.addEventListener("change", () => store.set("roadrec_api", apiEl.value.trim()));
+if (q.get("api")) store.set("roadrec_api", q.get("api"));
+const base = () => apiEl.value.trim().replace(/\/$/, "");
+// keep the server address when going back to the reader
+$("back").href = "index.html" + (q.get("api") ? "?api=" + encodeURIComponent(q.get("api")) : "");
+
+async function call(path, opt) {
+  let r;
+  try { r = await fetch(base() + path, opt) }
+  catch (_) { throw new Error("Cannot reach the RoadRec server at " + base() + ". Is the backend running?") }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw Object.assign(new Error(j.detail?.message || "Request failed (" + r.status + ")"), { status: r.status, code: j.detail?.code });
+  return j;
+}
+
+let trail = [], timer = null, token = null, mode = null, shareCode = null;
+
+function showView(reg, label, extraKey, extraVal) {
+  if ($("view").hidden) resetMap();
+  for (const g of ["gate-login", "gate-pick", "gate-otp"]) $(g).hidden = true; $("view").hidden = false;
+  $("reg").textContent = reg; $("lbl").textContent = label || "";
+  $("k-extra").textContent = extraKey; $("v-extra").textContent = extraVal;
+}
+function backToGate(msg) {
+  stopStream();
+  clearInterval(timer); timer = null; token = null;
+  if (mode === "otp") gate("gate-otp"); else if (authTok) gate("gate-pick"); else gate("gate-login");
+  $("e").textContent = msg || "";
+}
+
+function status(cls, text) { $("stat").className = cls; $("stat").textContent = text }
+
+let lmap = null, line = null, dot = null;
+function resetMap() { if (lmap) { lmap.remove(); lmap = null; line = null; dot = null } }
+function draw(l) {
+  const a = $("osm"); a.hidden = false;
+  a.href = `https://www.openstreetmap.org/?mlat=${l.lat}&mlon=${l.lon}#map=17/${l.lat}/${l.lon}`;
+  if (typeof L === "undefined") { $("map").hidden = true; $("mapnote").hidden = false; return }
+  const pts = (trail.length ? trail : [l]).map(p => [p.lat, p.lon]);
+  if (!lmap) {
+    lmap = L.map("map").setView([l.lat, l.lon], 16);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }).addTo(lmap);
+    line = L.polyline(pts, { color: "#16695c", weight: 4, opacity: .8 }).addTo(lmap);
+    dot = L.circleMarker([l.lat, l.lon], { radius: 9, color: "#1c2125", weight: 2, fillColor: "#f0b90b", fillOpacity: 1 }).addTo(lmap);
+    lmap.invalidateSize();
+    if (pts.length > 1) lmap.fitBounds(line.getBounds(), { padding: [30, 30], maxZoom: 17 });
+  } else {
+    line.setLatLngs(pts); dot.setLatLng([l.lat, l.lon]);
+    if (!lmap.getBounds().contains([l.lat, l.lon])) lmap.panTo([l.lat, l.lon]);   // follow the vehicle if it leaves the view
+  }
+}
+function updatePosition(l, stale) {
+  status(stale ? "err" : "ok", stale ? "No recent fix (vehicle offline or no GPS signal)" : "Live");
+  $("pos").textContent = l.lat.toFixed(5) + ", " + l.lon.toFixed(5);
+  $("spd").textContent = l.speed_mps == null ? "-" : Math.round(l.speed_mps * 3.6) + " km/h";
+  $("ts").textContent = new Date(l.recorded_at).toLocaleTimeString();
+  draw(l);
+}
+
+// ---- mode 1: owner, logged in with their RoadRec account --------------------------------------------
+const TK = "roadrec_token";
+const sess = { get(){ try { return sessionStorage.getItem(TK) } catch(_) { return null } },
+               set(v){ try { v ? sessionStorage.setItem(TK, v) : sessionStorage.removeItem(TK) } catch(_) {} } };
+let authTok = sess.get(), vehicleId = null, streamAbort = null;
+const authH = () => ({ Authorization: "Bearer " + authTok });
+
+function gate(name) { resetMap(); for (const g of ["gate-login", "gate-pick", "gate-otp"]) $(g).hidden = g !== name; $("view").hidden = true }
+
+async function login(email, password) {
+  $("e").textContent = "";
+  try {
+    const j = await call("/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
+    if (j.user && j.user.role !== "fleet_manager") throw new Error("Only fleet-manager accounts can track vehicles.");
+    authTok = j.access_token; sess.set(authTok); $("pw").value = "";
+    await showVehicles(j.user && (j.user.name || j.user.email));
+  } catch (err) { $("e").textContent = err.message }
+}
+async function showVehicles(who) {
+  try {
+    const list = await call("/vehicles", { headers: authH() });
+    $("who").textContent = who ? "Signed in as " + who : "";
+    const box = $("vlist"); box.textContent = "";
+    if (!list.length) box.textContent = "No vehicles are registered to your account yet.";
+    for (const v of list) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "veh";
+      b.textContent = v.reg_no; const sm = document.createElement("small"); sm.textContent = v.name || ""; b.appendChild(sm);
+      b.onclick = () => startOwner(v); box.appendChild(b);
+    }
+    gate("gate-pick");
+    if (list.length === 1) startOwner(list[0]);     // only one vehicle: open it straight away
+  } catch (err) { signOut(err.status === 401 ? "Please sign in again." : err.message) }
+}
+function signOut(msg) {
+  stopStream(); authTok = null; sess.set(null); gate("gate-login"); $("e").textContent = msg || "";
+}
+async function startOwner(v) {
+  $("e").textContent = "";
+  try {
+    const j = await call(`/vehicles/${v.id}/live`, { headers: authH() });
+    vehicleId = v.id;
+    showView(j.vehicle_reg_no, j.name, "Vehicle", j.vehicle_reg_no);
+    trail = j.trail || [];
+    if (j.latest) updatePosition(j.latest, j.stale); else status("err", "Waiting for the vehicle's GPS signal...");
+    connectStream(v.id);
+  } catch (err) { if (err.status === 401) signOut("Please sign in again."); else { gate("gate-pick"); $("e").textContent = err.message } }
+}
+function stopStream() { if (streamAbort) { streamAbort.abort(); streamAbort = null } }
+// EventSource cannot send an Authorization header, so read the stream with fetch.
+async function connectStream(id) {
+  stopStream();
+  const ab = streamAbort = new AbortController();
+  while (!ab.signal.aborted) {
+    try {
+      const r = await fetch(`${base()}/vehicles/${id}/live/stream`, { headers: authH(), signal: ab.signal });
+      if (r.status === 401 || r.status === 403 || r.status === 404) { signOutOrBack(r.status); return }
+      if (!r.ok) throw new Error("stream " + r.status);
+      status("ok", "Live (real-time stream connected)");
+      const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+      for (;;) {
+        const { done, value } = await rd.read(); if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i; while ((i = buf.indexOf("\n\n")) >= 0) {
+          const line = buf.slice(0, i); buf = buf.slice(i + 2);
+          if (line.startsWith("data: ")) { const p = JSON.parse(line.slice(6)); trail.push(p); if (trail.length > 200) trail.shift(); updatePosition(p, false) }
+        }
+      }
+    } catch (err) { if (ab.signal.aborted) return }
+    status("err", "Connection interrupted, reconnecting...");
+    await new Promise(r => setTimeout(r, 3000));
+  }
+}
+function signOutOrBack(code) {
+  stopStream();
+  if (code === 401) signOut("Please sign in again.");
+  else { gate("gate-pick"); $("e").textContent = "Live tracking is paused for this vehicle, or it is not yours." }
+}
+
+// ---- mode 2: share link + 6-digit code, polled every 5 s -----------------------------------------
+async function unlock() {
+  $("e").textContent = "";
+  try {
+    const j = await call(`/live/${encodeURIComponent(shareCode)}/unlock`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ otp: $("otp").value.trim() }) });
+    token = j.viewer_token; $("otp").value = "";
+    await poll(true); timer = setInterval(poll, 5000);
+  } catch (err) { $("e").textContent = err.message }
+}
+async function poll(first) {
+  try {
+    const j = await call(`/live/${encodeURIComponent(shareCode)}`, { headers: { Authorization: "Bearer " + token } });
+    showView(j.vehicle_reg_no, j.label, "Link expires", new Date(j.share_expires_at).toLocaleString());
+    trail = j.trail || [];
+    if (!j.latest) { status("err", "No position received yet."); return }
+    updatePosition(j.latest, j.stale);
+  } catch (err) {
+    if ([401, 403, 410, 423].includes(err.status)) backToGate(err.message);
+    else if (first) throw err; else status("err", err.message);
+  }
+}
+
+// ---- wiring ------------------------------------------------------------------------------------------
+$("lf").addEventListener("submit", e => { e.preventDefault(); login($("em").value.trim(), $("pw").value) });
+$("signout").onclick = () => signOut("");
+$("go-otp").onclick = unlock;
+$("otp").addEventListener("keydown", e => { if (e.key === "Enter") unlock() });
+$("stop").onclick = () => backToGate("");
+
+const linkCode = q.get("c") || (location.hash.length > 1 ? location.hash.slice(1) : "");
+if (linkCode) {                          // share link for an authority: needs the 6-digit code
+  mode = "otp"; shareCode = linkCode; gate("gate-otp");
+} else {
+  mode = "owner";
+  if (authTok) showVehicles(); else gate("gate-login");
+}
+if (location.protocol === "https:" && /^http:\/\/(?!localhost|127\.0\.0\.1)/.test(base()))
+  $("srvnote").textContent = "This page is on HTTPS, so browsers will block an http:// server. Use an https:// server address.";
+</script></body></html>
