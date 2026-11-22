@@ -490,7 +490,7 @@ $("a-forgot").onclick=()=>{$("a-msg").textContent="Local demo accounts cannot be
 $("signout").onclick=leave;
 // ---- real account on the RoadRec server (also used by live.html); falls back to the local demo accounts if the server is unreachable ----
 async function backendAuth(m,email,pw,pw2){
- let api="http://localhost:8000";try{api=new URLSearchParams(location.search).get("api")||localStorage.getItem("roadrec_api")||api}catch(e){}
+ let api="https://roadrecfriday.onrender.com";try{api=new URLSearchParams(location.search).get("api")||localStorage.getItem("roadrec_api")||api}catch(e){}
  api=api.replace(/\/$/,"");
  const post=async(path,body)=>{let r;try{r=await fetch(api+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:AbortSignal.timeout(4000)})}catch(e){return null}
   return {ok:r.ok,status:r.status,j:await r.json().catch(()=>({}))}};

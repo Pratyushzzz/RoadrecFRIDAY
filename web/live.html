@@ -90,7 +90,7 @@ const store = {
 
 // ---- server address: ?api=... > saved by either page > local default ---------------------------------
 const apiEl = $("api");
-apiEl.value = q.get("api") || store.get("roadrec_api") || "http://localhost:8000";
+apiEl.value = q.get("api") || store.get("roadrec_api") || "https://roadrecfriday.onrender.com";
 if (!q.get("api")) $("apirow").hidden = false;
 apiEl.addEventListener("change", () => store.set("roadrec_api", apiEl.value.trim()));
 if (q.get("api")) store.set("roadrec_api", q.get("api"));
