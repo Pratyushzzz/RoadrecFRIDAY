@@ -71,6 +71,7 @@ a{color:var(--teal)}[hidden]{display:none!important}
     <dt id="k-extra">Vehicle</dt><dd id="v-extra">-</dd>
   </dl>
   <p><a id="osm" target="_blank" rel="noopener noreferrer" hidden>Open in OpenStreetMap</a></p>
+  <p><button class="go" id="demo" type="button" style="background:var(--panel);color:var(--ink);border:1px solid var(--line)">Start demo drive (fake GPS)</button></p>
   <p><button class="go" id="stop" type="button" style="background:var(--panel);color:var(--ink);border:1px solid var(--line)">Stop tracking</button></p>
  </div>
 
@@ -268,4 +269,26 @@ if (linkCode) {                          // share link for an authority: needs t
 }
 if (location.protocol === "https:" && /^http:\/\/(?!localhost|127\.0\.0\.1)/.test(base()))
   $("srvnote").textContent = "This page is on HTTPS, so browsers will block an http:// server. Use an https:// server address.";
+
+// ---- demo drive: fake GPS points around Pune so the map can be shown without a real device ----------
+(function () {
+  const route = [[18.5314,73.8446],[18.5289,73.8478],[18.5262,73.8512],[18.5236,73.8553],[18.5204,73.8567],
+                 [18.5181,73.8530],[18.5167,73.8486],[18.5190,73.8440],[18.5230,73.8415],[18.5280,73.8420],[18.5314,73.8446]];
+  let demoTimer = null, seg = 0, step = 0;
+  const STEPS = 12;
+  function stopDemo() { if (demoTimer) { clearInterval(demoTimer); demoTimer = null } const b = $("demo"); if (b) b.textContent = "Start demo drive (fake GPS)" }
+  $("demo").addEventListener("click", () => {
+    if (demoTimer) { stopDemo(); return }
+    $("demo").textContent = "Stop demo drive";
+    demoTimer = setInterval(() => {
+      const a = route[seg % (route.length - 1)], b = route[(seg % (route.length - 1)) + 1], t = step / STEPS;
+      const p = { lat: a[0] + (b[0] - a[0]) * t, lon: a[1] + (b[1] - a[1]) * t,
+                  speed_mps: 8 + Math.random() * 4, recorded_at: new Date().toISOString() };
+      trail.push(p); if (trail.length > 200) trail.shift();
+      updatePosition(p, false);
+      if (++step > STEPS) { step = 0; seg++ }
+    }, 1000);
+  });
+  $("stop").addEventListener("click", stopDemo);
+})();
 </script></body></html>
